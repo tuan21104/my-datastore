@@ -8,22 +8,41 @@ import {
   Calendar, Folder, ExternalLink, Globe
 } from 'lucide-react';
 
+// --- ĐỊNH NGHĨA KIỂU DỮ LIỆU CHUẨN (Hết lỗi Any) ---
+interface Item {
+  _id: string;
+  title: string;
+  description: string;
+  url?: string;
+  imageUrl: string;
+  type: 'LINK' | 'IMAGE';
+  tags: string[];
+  createdAt: string;
+}
+
+interface PreviewData {
+  _id?: string;
+  title: string;
+  description: string;
+  url?: string;
+  imageUrl: string;
+  type?: 'LINK' | 'IMAGE';
+}
+
 export default function Dashboard() {
-  const [items, setItems] = useState<any[]>([]); 
+  const [items, setItems] = useState<Item[]>([]); 
   const [allTags, setAllTags] = useState<string[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [currentTab, setCurrentTab] = useState<'ALL' | 'LINK' | 'IMAGE'>('ALL');
   const [currentCollection, setCurrentCollection] = useState<string | null>(null);
-  
-  // State dành cho ô Search
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [loadingAction, setLoadingAction] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchItems(); }, []);
@@ -36,23 +55,17 @@ export default function Dashboard() {
       if (data.success) {
         setItems(data.data);
         const tags = new Set<string>();
-        data.data.forEach((item: any) => item.tags?.forEach((t: string) => tags.add(t)));
+        data.data.forEach((item: Item) => item.tags?.forEach((t) => tags.add(t)));
         setAllTags(Array.from(tags));
       }
     } catch { console.error("Lỗi lấy dữ liệu"); } 
     finally { setLoadingItems(false); }
   };
 
-  // --- LOGIC SEARCH & FILTER (BẢN CẬP NHẬT) ---
   const filteredItems = useMemo(() => {
     return items.filter(item => {
-      // 1. Lọc theo Tab (All/Link/Image)
       const matchesTab = currentTab === 'ALL' || item.type === currentTab;
-      
-      // 2. Lọc theo Collection (Tags)
       const matchesCollection = !currentCollection || item.tags?.includes(currentCollection);
-      
-      // 3. Lọc theo Search Query (Title hoặc Description)
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch = !query || 
         (item.title?.toLowerCase().includes(query)) || 
@@ -62,7 +75,6 @@ export default function Dashboard() {
     });
   }, [items, currentTab, currentCollection, searchQuery]);
 
-  // Các hàm API khác giữ nguyên
   const handleFetchPreview = async () => {
     if (!urlInput) return;
     setLoadingAction(true);
@@ -87,7 +99,8 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...previewData, action: 'SAVE_ITEM', type: previewData.type || 'LINK' }),
       });
-      if ((await res.json()).success) { toggleModal(); fetchItems(); }
+      const data = await res.json();
+      if (data.success) { toggleModal(); fetchItems(); }
     } catch { } finally { setLoadingAction(false); }
   };
 
@@ -100,11 +113,13 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action: 'DELETE_ITEM' }),
       });
-      if ((await res.json()).success) { fetchItems(); setSelectedItem(null); }
+      const data = await res.json();
+      if (data.success) { fetchItems(); setSelectedItem(null); }
     } catch { }
   };
 
   const handleUpdateItem = async () => {
+    if (!previewData) return;
     setLoadingAction(true);
     try {
       const res = await fetch('/api/items', {
@@ -117,7 +132,8 @@ export default function Dashboard() {
           description: previewData.description,
         }),
       });
-      if ((await res.json()).success) { toggleModal(); fetchItems(); setSelectedItem(null); }
+      const data = await res.json();
+      if (data.success) { toggleModal(); fetchItems(); setSelectedItem(null); }
     } catch { } finally { setLoadingAction(false); }
   };
 
@@ -222,7 +238,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* SIDE PANEL & MODAL giữ nguyên cấu trúc xịn của bạn... */}
+        {/* SIDE PANEL */}
         {selectedItem && (
           <>
             <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20" onClick={() => setSelectedItem(null)} />
@@ -276,7 +292,7 @@ export default function Dashboard() {
 
               {!isEditMode && !previewData ? (
                 <div className="grid grid-cols-2 gap-6 mb-10">
-                  <button onClick={() => setPreviewData({type: 'LINK'})} className="p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
+                  <button onClick={() => setPreviewData({ title: '', description: '', imageUrl: '', type: 'LINK' })} className="p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-100"><LinkIcon className="text-blue-500" /></div>
                     <h3 className="font-bold text-lg">Add a Link</h3>
                     <p className="text-xs text-slate-400 mt-1">Save articles or websites.</p>
@@ -300,8 +316,8 @@ export default function Dashboard() {
                     <div className="p-6 bg-slate-50 rounded-[32px] flex gap-6 border border-slate-100">
                       <img src={previewData.imageUrl || `https://www.google.com/s2/favicons?domain=${previewData.url}&sz=128`} className="w-24 h-24 rounded-2xl object-cover shadow-sm bg-white" alt="p" />
                       <div className="flex-1 space-y-2">
-                        <input value={previewData.title || ""} onChange={e => setPreviewData({...previewData, title: e.target.value})} className="font-bold bg-transparent border-none w-full p-0 focus:ring-0 text-lg text-slate-800" placeholder="Tiêu đề..." />
-                        <textarea value={previewData.description || ""} onChange={e => setPreviewData({...previewData, description: e.target.value})} className="text-sm text-slate-400 bg-transparent border-none w-full p-0 focus:ring-0 h-20 resize-none" placeholder="Mô tả..." />
+                        <input value={previewData.title} onChange={(e) => setPreviewData({ ...previewData, title: e.target.value })} className="font-bold bg-transparent border-none w-full p-0 focus:ring-0 text-lg text-slate-800" placeholder="Tiêu đề..." />
+                        <textarea value={previewData.description} onChange={(e) => setPreviewData({ ...previewData, description: e.target.value })} className="text-sm text-slate-400 bg-transparent border-none w-full p-0 focus:ring-0 h-20 resize-none" placeholder="Mô tả..." />
                       </div>
                     </div>
                   )}
