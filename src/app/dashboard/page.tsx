@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Database, LayoutGrid, Link as LinkIcon, Image as ImageIcon, 
   Search, Plus, Edit3, Trash2, X, Loader2, 
-  Calendar, Folder, ExternalLink, Globe
+  Calendar, Folder, ExternalLink, Globe, PlusCircle
 } from 'lucide-react';
 
 // --- ĐỊNH NGHĨA KIỂU DỮ LIỆU ---
@@ -49,6 +49,10 @@ export default function Dashboard() {
   // State cho Mobile Sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // --- NEW: States cho việc thêm Category ---
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+
   useEffect(() => { fetchItems(); }, []);
 
   const fetchItems = async () => {
@@ -64,6 +68,24 @@ export default function Dashboard() {
       }
     } catch { console.error("Lỗi lấy dữ liệu"); } 
     finally { setLoadingItems(false); }
+  };
+
+  // --- NEW: Hàm xử lý thêm/xóa Tag (Category) ---
+  const handleAddTag = () => {
+    if (!newTagName.trim()) return;
+    if (!allTags.includes(newTagName.trim())) {
+      setAllTags([...allTags, newTagName.trim()]);
+    }
+    setNewTagName("");
+    setIsAddingTag(false);
+  };
+
+  const handleDeleteTag = (tagToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`Xóa danh mục "${tagToDelete}" khỏi danh sách hiển thị?`)) {
+      setAllTags(allTags.filter(t => t !== tagToDelete));
+      if (currentCollection === tagToDelete) setCurrentCollection(null);
+    }
   };
 
   const filteredItems = useMemo(() => {
@@ -89,7 +111,7 @@ export default function Dashboard() {
         body: JSON.stringify({ url: urlInput, action: 'FETCH_PREVIEW' }),
       });
       const data = await res.json();
-      if (data.success) setPreviewData({ ...data.preview, tags: ['Tech'] });
+      if (data.success) setPreviewData({ ...data.preview, tags: [allTags[0] || 'Tech'] });
     } catch { alert("Lỗi kết nối"); } 
     finally { setLoadingAction(false); }
   };
@@ -105,7 +127,7 @@ export default function Dashboard() {
           ...previewData, 
           action: 'SAVE_ITEM', 
           type: previewData.type || 'LINK',
-          tags: previewData.tags || ['Tech']
+          tags: previewData.tags || [allTags[0] || 'Tech']
         }),
       });
       const data = await res.json();
@@ -160,7 +182,7 @@ export default function Dashboard() {
           imageUrl: data.url, 
           type: 'IMAGE', 
           description: 'Uploaded image',
-          tags: ['Tech']
+          tags: [allTags[0] || 'Tech']
         });
       }
     } catch { } finally { setLoadingAction(false); }
@@ -176,7 +198,6 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#F8F6F6] text-slate-900 font-sans overflow-hidden">
       
-      {/* OVERLAY FOR MOBILE SIDEBAR */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/40 z-[60] md:hidden backdrop-blur-sm" 
@@ -212,11 +233,46 @@ export default function Dashboard() {
           <button onClick={() => {setCurrentTab('IMAGE'); setCurrentCollection(null); setIsSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'IMAGE' ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
             <ImageIcon className="w-5 h-5" /> IMAGES
           </button>
-          <div className="pt-6 pb-2 px-4 text-[10px] uppercase font-bold text-slate-400 tracking-widest">Collections</div>
-          {allTags.map(tag => (
-            <button key={tag} onClick={() => {setCurrentCollection(tag); setCurrentTab('ALL'); setIsSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm transition-all ${currentCollection === tag ? 'text-[#ec5b13] font-bold bg-orange-50/50' : 'text-slate-500 hover:text-[#ec5b13]'}`}>
-              <Folder className="w-4 h-4" /> {tag}
+          
+          {/* SECTION COLLECTIONS VỚI NÚT THÊM MỚI */}
+          <div className="pt-6 pb-2 px-4 flex justify-between items-center">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Collections</span>
+            <button onClick={() => setIsAddingTag(!isAddingTag)} className="text-[#ec5b13] hover:scale-110 transition-transform">
+              <PlusCircle className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* INPUT THÊM CATEGORY NHANH */}
+          {isAddingTag && (
+            <div className="px-4 mb-2 animate-in slide-in-from-top-1 duration-200">
+              <input 
+                autoFocus
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                onBlur={() => !newTagName && setIsAddingTag(false)}
+                className="w-full p-2 bg-slate-50 border border-orange-100 rounded-lg text-xs outline-none focus:ring-1 focus:ring-[#ec5b13]"
+                placeholder="Tên danh mục..."
+              />
+            </div>
+          )}
+
+          {allTags.map(tag => (
+            <div key={tag} className="group relative">
+              <button 
+                onClick={() => {setCurrentCollection(tag); setCurrentTab('ALL'); setIsSidebarOpen(false);}} 
+                className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm transition-all ${currentCollection === tag ? 'text-[#ec5b13] font-bold bg-orange-50/50' : 'text-slate-500 hover:text-[#ec5b13]'}`}
+              >
+                <Folder className="w-4 h-4" /> {tag}
+              </button>
+              {/* NÚT XÓA CATEGORY KHI HOVER */}
+              <button 
+                onClick={(e) => handleDeleteTag(tag, e)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           ))}
         </nav>
       </aside>
@@ -332,7 +388,7 @@ export default function Dashboard() {
 
               {!isEditMode && !previewData ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-8">
-                  <button onClick={() => setPreviewData({ title: '', description: '', imageUrl: '', type: 'LINK', tags: ['Tech'] })} className="p-6 md:p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
+                  <button onClick={() => setPreviewData({ title: '', description: '', imageUrl: '', type: 'LINK', tags: [allTags[0] || 'Tech'] })} className="p-6 md:p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-100"><LinkIcon className="text-blue-500" /></div>
                     <h3 className="font-bold text-lg">Add a Link</h3>
                     <p className="text-xs text-slate-400 mt-1">Save articles or websites.</p>
@@ -362,18 +418,15 @@ export default function Dashboard() {
                         </div>
                       </div>
                       
-                      {/* CATEGORY SELECTOR */}
+                      {/* CATEGORY SELECTOR TỰ ĐỘNG CẬP NHẬT THEO ALLTAGS */}
                       <div className="space-y-2 px-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Collection</label>
                         <select 
-                          value={previewData.tags?.[0] || "Tech"} 
+                          value={previewData.tags?.[0] || allTags[0]} 
                           onChange={(e) => setPreviewData({ ...previewData, tags: [e.target.value] })}
                           className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#ec5b13] text-sm appearance-none cursor-pointer"
                         >
-                          <option value="Tech">Tech</option>
-                          <option value="Work">Work</option>
-                          <option value="Personal">Personal</option>
-                          <option value="Finance">Finance</option>
+                          {allTags.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                     </div>
