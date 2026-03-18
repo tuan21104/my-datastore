@@ -8,7 +8,7 @@ import {
   Calendar, Folder, ExternalLink, Globe
 } from 'lucide-react';
 
-// --- ĐỊNH NGHĨA KIỂU DỮ LIỆU CHUẨN (Hết lỗi Any) ---
+// --- ĐỊNH NGHĨA KIỂU DỮ LIỆU ---
 interface Item {
   _id: string;
   title: string;
@@ -27,6 +27,7 @@ interface PreviewData {
   url?: string;
   imageUrl: string;
   type?: 'LINK' | 'IMAGE';
+  tags?: string[];
 }
 
 export default function Dashboard() {
@@ -44,6 +45,9 @@ export default function Dashboard() {
   const [loadingAction, setLoadingAction] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // State cho Mobile Sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -85,7 +89,7 @@ export default function Dashboard() {
         body: JSON.stringify({ url: urlInput, action: 'FETCH_PREVIEW' }),
       });
       const data = await res.json();
-      if (data.success) setPreviewData(data.preview);
+      if (data.success) setPreviewData({ ...data.preview, tags: ['Tech'] });
     } catch { alert("Lỗi kết nối"); } 
     finally { setLoadingAction(false); }
   };
@@ -97,7 +101,12 @@ export default function Dashboard() {
       const res = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...previewData, action: 'SAVE_ITEM', type: previewData.type || 'LINK' }),
+        body: JSON.stringify({ 
+          ...previewData, 
+          action: 'SAVE_ITEM', 
+          type: previewData.type || 'LINK',
+          tags: previewData.tags || ['Tech']
+        }),
       });
       const data = await res.json();
       if (data.success) { toggleModal(); fetchItems(); }
@@ -130,6 +139,7 @@ export default function Dashboard() {
           action: 'UPDATE_ITEM',
           title: previewData.title,
           description: previewData.description,
+          tags: previewData.tags
         }),
       });
       const data = await res.json();
@@ -145,7 +155,13 @@ export default function Dashboard() {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
-        setPreviewData({ title: file.name, imageUrl: data.url, type: 'IMAGE', description: 'Uploaded image' });
+        setPreviewData({ 
+          title: file.name, 
+          imageUrl: data.url, 
+          type: 'IMAGE', 
+          description: 'Uploaded image',
+          tags: ['Tech']
+        });
       }
     } catch { } finally { setLoadingAction(false); }
   };
@@ -159,27 +175,46 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-[#F8F6F6] text-slate-900 font-sans overflow-hidden">
+      
+      {/* OVERLAY FOR MOBILE SIDEBAR */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-[60] md:hidden backdrop-blur-sm" 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+      )}
+
       {/* SIDEBAR */}
-      <aside className="w-72 bg-white border-r border-slate-200 flex flex-col p-6 h-full">
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 bg-[#ec5b13] rounded-xl flex items-center justify-center text-white shadow-lg">
-            <Database className="w-6 h-6" />
+      <aside className={`
+        w-72 bg-white border-r border-slate-200 flex flex-col p-6 h-full
+        fixed md:sticky top-0 left-0 z-[70] transition-transform duration-300
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="flex justify-between items-center mb-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#ec5b13] rounded-xl flex items-center justify-center text-white shadow-lg">
+              <Database className="w-6 h-6" />
+            </div>
+            <span className="font-bold text-xl tracking-tight">DataStore</span>
           </div>
-          <span className="font-bold text-xl tracking-tight">DataStore</span>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-slate-400">
+            <X className="w-6 h-6" />
+          </button>
         </div>
+        
         <nav className="space-y-2 flex-1 overflow-y-auto">
-          <button onClick={() => {setCurrentTab('ALL'); setCurrentCollection(null)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'ALL' && !currentCollection ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
+          <button onClick={() => {setCurrentTab('ALL'); setCurrentCollection(null); setIsSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'ALL' && !currentCollection ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
             <LayoutGrid className="w-5 h-5" /> ALL ITEMS
           </button>
-          <button onClick={() => {setCurrentTab('LINK'); setCurrentCollection(null)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'LINK' ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
+          <button onClick={() => {setCurrentTab('LINK'); setCurrentCollection(null); setIsSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'LINK' ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
             <LinkIcon className="w-5 h-5" /> LINKS
           </button>
-          <button onClick={() => {setCurrentTab('IMAGE'); setCurrentCollection(null)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'IMAGE' ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
+          <button onClick={() => {setCurrentTab('IMAGE'); setCurrentCollection(null); setIsSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${currentTab === 'IMAGE' ? 'bg-[#ec5b13]/10 text-[#ec5b13]' : 'text-slate-400 hover:bg-slate-50'}`}>
             <ImageIcon className="w-5 h-5" /> IMAGES
           </button>
           <div className="pt-6 pb-2 px-4 text-[10px] uppercase font-bold text-slate-400 tracking-widest">Collections</div>
           {allTags.map(tag => (
-            <button key={tag} onClick={() => {setCurrentCollection(tag); setCurrentTab('ALL');}} className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm transition-all ${currentCollection === tag ? 'text-[#ec5b13] font-bold bg-orange-50/50' : 'text-slate-500 hover:text-[#ec5b13]'}`}>
+            <button key={tag} onClick={() => {setCurrentCollection(tag); setCurrentTab('ALL'); setIsSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm transition-all ${currentCollection === tag ? 'text-[#ec5b13] font-bold bg-orange-50/50' : 'text-slate-500 hover:text-[#ec5b13]'}`}>
               <Folder className="w-4 h-4" /> {tag}
             </button>
           ))}
@@ -188,32 +223,37 @@ export default function Dashboard() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto relative">
-        <header className="flex justify-between items-center p-10 sticky top-0 bg-[#F8F6F6]/90 backdrop-blur-md z-10">
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">My Library</h1>
-            <p className="text-slate-400 text-sm">Found {filteredItems.length} items</p>
+        <header className="flex justify-between items-center p-6 md:p-10 sticky top-0 bg-[#F8F6F6]/90 backdrop-blur-md z-10">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-slate-600 bg-white rounded-lg shadow-sm">
+              <LayoutGrid className="w-6 h-6" />
+            </button>
+            <div>
+              <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">My Library</h1>
+              <p className="text-slate-400 text-xs md:sm">Found {filteredItems.length} items</p>
+            </div>
           </div>
-          <div className="flex gap-4">
-            <div className="relative">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="relative hidden lg:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input 
                 value={searchQuery} 
                 onChange={e => setSearchQuery(e.target.value)} 
-                className="pl-10 pr-4 py-2 bg-white border-none rounded-xl w-64 shadow-sm focus:ring-2 focus:ring-[#ec5b13] outline-none" 
-                placeholder="Search title or desc..." 
+                className="pl-10 pr-4 py-2 bg-white border-none rounded-xl w-48 xl:w-64 shadow-sm focus:ring-2 focus:ring-[#ec5b13] outline-none" 
+                placeholder="Search..." 
               />
             </div>
-            <button onClick={toggleModal} className="bg-[#ec5b13] text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-[#ec5b13]/20 flex items-center gap-2 hover:bg-[#d44d0f] transition-all">
-              <Plus className="w-5 h-5" /> Add New Item
+            <button onClick={toggleModal} className="bg-[#ec5b13] text-white p-2.5 md:px-6 md:py-2 rounded-xl font-bold shadow-lg shadow-[#ec5b13]/20 flex items-center gap-2 hover:bg-[#d44d0f] transition-all">
+              <Plus className="w-5 h-5" /> <span className="hidden md:inline">Add New</span>
             </button>
           </div>
         </header>
 
-        <div className="px-10 pb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="px-6 md:px-10 pb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {loadingItems ? (
              <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-[#ec5b13]" /></div>
           ) : filteredItems.length === 0 ? (
-            <div className="col-span-full text-center py-20 text-slate-400">Không tìm thấy kết quả nào cho "{searchQuery}"</div>
+            <div className="col-span-full text-center py-20 text-slate-400">No items found</div>
           ) : filteredItems.map(item => (
             <article 
               key={item._id} 
@@ -230,9 +270,9 @@ export default function Dashboard() {
               </div>
               <h3 className="font-bold text-slate-900 mb-1 line-clamp-1">{item.title}</h3>
               <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{item.description}</p>
-              <div className="mt-4 flex justify-between items-center text-[10px] font-bold text-slate-300">
+              <div className="mt-4 flex justify-between items-center text-[10px] font-bold text-slate-300 uppercase">
                 <span>{new Date(item.createdAt).toLocaleDateString()}</span>
-                <span className={`px-2 py-1 rounded-md uppercase ${item.type === 'LINK' ? 'bg-blue-50 text-blue-500' : 'bg-orange-50 text-[#ec5b13]'}`}>{item.type}</span>
+                <span className={`px-2 py-1 rounded-md ${item.type === 'LINK' ? 'bg-blue-50 text-blue-500' : 'bg-orange-50 text-[#ec5b13]'}`}>{item.type}</span>
               </div>
             </article>
           ))}
@@ -241,8 +281,8 @@ export default function Dashboard() {
         {/* SIDE PANEL */}
         {selectedItem && (
           <>
-            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20" onClick={() => setSelectedItem(null)} />
-            <aside className="fixed top-0 right-0 h-full w-full md:w-[400px] bg-white shadow-2xl z-30 flex flex-col border-l animate-in slide-in-from-right duration-300">
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[80]" onClick={() => setSelectedItem(null)} />
+            <aside className="fixed top-0 right-0 h-full w-full sm:w-[400px] bg-white shadow-2xl z-[90] flex flex-col border-l animate-in slide-in-from-right duration-300">
               <div className="p-6 border-b flex justify-between items-center">
                 <button onClick={() => setSelectedItem(null)} className="p-2 hover:bg-slate-50 rounded-full"><X className="w-6 h-6" /></button>
                 <div className="flex gap-2">
@@ -284,20 +324,20 @@ export default function Dashboard() {
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/40 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
-            <div className="p-10">
-              <div className="flex justify-between items-center mb-10">
-                <h2 className="text-2xl font-black text-slate-900">{isEditMode ? "Edit Item" : "Add New Item"}</h2>
+            <div className="p-6 md:p-10">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-xl md:text-2xl font-black text-slate-900">{isEditMode ? "Edit Item" : "Add New Item"}</h2>
                 <button onClick={toggleModal} className="text-slate-400 hover:text-slate-600 p-2"><X className="w-8 h-8" /></button>
               </div>
 
               {!isEditMode && !previewData ? (
-                <div className="grid grid-cols-2 gap-6 mb-10">
-                  <button onClick={() => setPreviewData({ title: '', description: '', imageUrl: '', type: 'LINK' })} className="p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-8">
+                  <button onClick={() => setPreviewData({ title: '', description: '', imageUrl: '', type: 'LINK', tags: ['Tech'] })} className="p-6 md:p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-100"><LinkIcon className="text-blue-500" /></div>
                     <h3 className="font-bold text-lg">Add a Link</h3>
                     <p className="text-xs text-slate-400 mt-1">Save articles or websites.</p>
                   </button>
-                  <button onClick={() => fileInputRef.current?.click()} className="p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
+                  <button onClick={() => fileInputRef.current?.click()} className="p-6 md:p-8 rounded-[32px] border-2 border-slate-100 hover:border-[#ec5b13] hover:bg-orange-50/50 transition-all text-left group">
                     <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-100"><ImageIcon className="text-[#ec5b13]" /></div>
                     <h3 className="font-bold text-lg">Upload Image</h3>
                     <p className="text-xs text-slate-400 mt-1">Store local photos.</p>
@@ -308,30 +348,47 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   {previewData?.type === 'LINK' && !isEditMode && !previewData.title && (
                     <div className="flex gap-2">
-                      <input value={urlInput} onChange={e => setUrlInput(e.target.value)} className="flex-1 bg-slate-50 border-none rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#ec5b13]" placeholder="Paste link ở đây..." />
-                      <button onClick={handleFetchPreview} className="bg-slate-900 text-white px-8 rounded-2xl font-bold">Fetch</button>
+                      <input value={urlInput} onChange={e => setUrlInput(e.target.value)} className="flex-1 bg-slate-50 border-none rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#ec5b13]" placeholder="Paste link..." />
+                      <button onClick={handleFetchPreview} className="bg-slate-900 text-white px-6 rounded-2xl font-bold">Fetch</button>
                     </div>
                   )}
                   {previewData && (
-                    <div className="p-6 bg-slate-50 rounded-[32px] flex gap-6 border border-slate-100">
-                      <img src={previewData.imageUrl || `https://www.google.com/s2/favicons?domain=${previewData.url}&sz=128`} className="w-24 h-24 rounded-2xl object-cover shadow-sm bg-white" alt="p" />
-                      <div className="flex-1 space-y-2">
-                        <input value={previewData.title} onChange={(e) => setPreviewData({ ...previewData, title: e.target.value })} className="font-bold bg-transparent border-none w-full p-0 focus:ring-0 text-lg text-slate-800" placeholder="Tiêu đề..." />
-                        <textarea value={previewData.description} onChange={(e) => setPreviewData({ ...previewData, description: e.target.value })} className="text-sm text-slate-400 bg-transparent border-none w-full p-0 focus:ring-0 h-20 resize-none" placeholder="Mô tả..." />
+                    <div className="flex flex-col gap-6">
+                      <div className="p-6 bg-slate-50 rounded-[32px] flex flex-col sm:flex-row gap-6 border border-slate-100">
+                        <img src={previewData.imageUrl || `https://www.google.com/s2/favicons?domain=${previewData.url}&sz=128`} className="w-24 h-24 rounded-2xl object-cover shadow-sm bg-white self-center sm:self-start" alt="p" />
+                        <div className="flex-1 space-y-2">
+                          <input value={previewData.title} onChange={(e) => setPreviewData({ ...previewData, title: e.target.value })} className="font-bold bg-transparent border-none w-full p-0 focus:ring-0 text-lg text-slate-800" placeholder="Title..." />
+                          <textarea value={previewData.description} onChange={(e) => setPreviewData({ ...previewData, description: e.target.value })} className="text-sm text-slate-400 bg-transparent border-none w-full p-0 focus:ring-0 h-20 resize-none" placeholder="Description..." />
+                        </div>
+                      </div>
+                      
+                      {/* CATEGORY SELECTOR */}
+                      <div className="space-y-2 px-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Collection</label>
+                        <select 
+                          value={previewData.tags?.[0] || "Tech"} 
+                          onChange={(e) => setPreviewData({ ...previewData, tags: [e.target.value] })}
+                          className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[#ec5b13] text-sm appearance-none cursor-pointer"
+                        >
+                          <option value="Tech">Tech</option>
+                          <option value="Work">Work</option>
+                          <option value="Personal">Personal</option>
+                          <option value="Finance">Finance</option>
+                        </select>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="mt-10 flex justify-end gap-3">
-                <button onClick={toggleModal} className="px-6 py-4 font-bold text-slate-400 hover:text-slate-600">Hủy</button>
+              <div className="mt-8 flex justify-end gap-3">
+                <button onClick={toggleModal} className="px-6 py-4 font-bold text-slate-400 hover:text-slate-600">Cancel</button>
                 <button 
                   onClick={isEditMode ? handleUpdateItem : handleSaveItem} 
                   disabled={loadingAction || (!previewData?.title)}
                   className="bg-[#ec5b13] text-white px-12 py-4 rounded-2xl font-black shadow-xl shadow-[#ec5b13]/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {loadingAction ? <Loader2 className="animate-spin" /> : (isEditMode ? "Cập nhật" : "Lưu vào Library")}
+                  {loadingAction ? <Loader2 className="animate-spin" /> : (isEditMode ? "Update" : "Save")}
                 </button>
               </div>
             </div>
